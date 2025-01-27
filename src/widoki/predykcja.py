@@ -1,6 +1,10 @@
+import pickle
 import tkinter as tk
+from tkinter import messagebox
 from tkinter import Entry, IntVar, Radiobutton, ttk
 from src.Enumy import CityEnum
+from src.helpers import create_floatslider, create_slider
+profile_cache_path = "./cache/profile_preset.pkl"
 
 def create_prediction_tab(notebook, profile, prediction_function, model):
     prediction_frame = ttk.Frame(notebook)
@@ -30,14 +34,11 @@ def create_prediction_tab(notebook, profile, prediction_function, model):
         data["elevator"] = float(hasElevator_var.get())
         data["security"] = float(hasSecurity_var.get())
         data["storage"] = float(hasStorage_var.get())
-
         print(data)
         
         price = prediction_function(model, data)
         print(price)
         formatted_price = f"{price[0]:,.2f}".replace(",", " ").replace(".", ",")
-        
-        print(price)
         price_label.config(text = f"Szacowana cena: {formatted_price} PLN")
 
     # --- Miasto --- #
@@ -58,42 +59,19 @@ def create_prediction_tab(notebook, profile, prediction_function, model):
     Radiobutton(radio_frame, text="Kamienica", variable=type_var, value=2).pack(side="left")
 
     # --- Powierzchnia --- #
-    ttk.Label(prediction_frame, text="Powierzchnia:").grid(row=3, column=0, padx=5, pady=5, sticky="w")
     sqm_var = tk.DoubleVar(value=profile.square_meters)
-
-    sqm_label_var = tk.StringVar(value=str(profile.square_meters))
-    sqm_label = ttk.Label(prediction_frame, textvariable=sqm_label_var)
-
-    # Attach a trace to the variable so it calls update_rooms_label on change
-    sqm_var.trace_add('write', lambda *args : sqm_label_var.set(str(int(sqm_var.get()))))
-    sqm_scale = ttk.Scale(prediction_frame, from_=15, to=100, orient=tk.HORIZONTAL, variable=sqm_var)
+    create_slider(prediction_frame, sqm_var, 10, 100, "Powierzchnia [sqm]:", 3)
     
-    sqm_label.grid(row=3, column=2, padx=5, pady=5, sticky="w")
-    sqm_scale.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
 
     # --- Odległość od centrum --- #
-    ttk.Label(prediction_frame, text="Odległość do centrum [km]:").grid(row=4, column=0, padx=5, pady=5, sticky="w")
     center_var = tk.DoubleVar(value=profile.distanceFromCenter)
-    slider = tk.StringVar()
-    slider.set(profile.distanceFromCenter)
-    center_distance_scale = ttk.Scale(prediction_frame, from_=0, to_=20, length=300, command=lambda s:slider.set('%0.2f' % float(s)), variable=center_var)
-    center_distance_label = ttk.Label(prediction_frame, textvariable=slider)
-    center_distance_scale.grid(row=4, column=1, padx=5, pady=5, sticky="w")
-    center_distance_label.grid(row=4, column=2, padx=5, pady=5, sticky="ew")
+    create_floatslider(prediction_frame, center_var, 0, 20, "Odległość do centrum [km]:", 4)
 
 
-
-    ttk.Label(prediction_frame, text="Pomieszczeń:").grid(row=5, column=0, padx=5, pady=5, sticky="w")
-
+    # --- Ilość pomieszczeń --- #
     rooms_var = tk.DoubleVar(value=profile.rooms)
+    create_slider(prediction_frame, rooms_var, 0, 20, "Pomieszczeń:", 5)
 
-    # Create a label that will display the current rooms_var value
-    rooms_label_var = tk.StringVar(value=str(profile.rooms))
-    rooms_value_label = ttk.Label(prediction_frame, textvariable=rooms_label_var)
-    rooms_var.trace_add('write', lambda *args : rooms_label_var.set(str(int(rooms_var.get()))))
-    rooms_scale = ttk.Scale(prediction_frame, from_=0, to=20, orient=tk.HORIZONTAL, variable=rooms_var)
-    rooms_value_label.grid(row=5, column=2, padx=5, pady=5, sticky="w")
-    rooms_scale.grid(row=5, column=1, padx=5, pady=5, sticky="ew")
 
     # klasa
     ttk.Label(prediction_frame, text="Klasa:").grid(row=6, column=0, padx=5, pady=5, sticky="w")
@@ -118,6 +96,50 @@ def create_prediction_tab(notebook, profile, prediction_function, model):
     ttk.Checkbutton(prediction_frame, text="Piwnica", variable=hasStorage_var).grid(row=12, column=0, padx=5, pady=5, sticky="w")
 
 
+    def get_data():
+        data = {}
+        data["city"] = city_combo.get()
+        data["type"] = type_var.get()
+        data["squareMeters"] = sqm_var.get()
+        data["centreDistance"] = center_var.get()
+        data["rooms"] = rooms_var.get()
+        data["condition"] = conditions_var.get()
+        data["balcony"] = hasBalcony_var.get()
+        data["parking"] = hasParking_var.get()
+        data["elevator"] = hasElevator_var.get()
+        data["security"] = hasSecurity_var.get()
+        data["storage"] = hasStorage_var.get()
+        return data;
+
+    def save_preset():
+        print("save_preset")
+        try:
+            data = get_data()
+            pickle.dump(data, open(profile_cache_path, "wb"))
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Wystąpił błąd: {str(e)}")    
+
+    def load_preset():
+        print("load_preset")
+        try:
+            data = pickle.load(open(profile_cache_path,'rb'))
+            print(data)
+            city_combo.set(data["city"])
+            type_var.set(data["type"])
+            sqm_var.set(data["squareMeters"])
+            center_var.set(data["centreDistance"] )
+            rooms_var.set(data["rooms"] )
+            conditions_var.set(data["condition"] )
+            hasBalcony_var.set(data["balcony"] )
+            hasParking_var.set(data["parking"] )
+            hasElevator_var.set(data["elevator"] )
+            hasSecurity_var.set(data["security"] )
+            hasStorage_var.set(data["storage"] )
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Wystąpił błąd: {str(e)}")
+
+    ttk.Button(prediction_frame, text="Zapisz", command=save_preset).grid(row=14, column=0, padx=5, pady=5, sticky="w")
+    ttk.Button(prediction_frame, text="Wczytaj", command=load_preset).grid(row=14, column=1, padx=5, pady=5, sticky="w")
     ttk.Button(prediction_frame, text="Oszacuj cenę", command=predict).grid(row=15, column=0, columnspan=3, padx=5, pady=5)
 
     price_label = ttk.Label(prediction_frame, text="Szacowana cena:")
